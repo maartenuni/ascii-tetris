@@ -1,6 +1,5 @@
 """Classes helpfull to implement Tetris"""
 
-
 from typing import List, Dict
 import random as r
 import sys
@@ -383,6 +382,9 @@ class Tetris:
         if self._collision():
             self.current.rotate_left()
 
+    def set_game_over(self):
+        self.game_over = True
+
 
 def _draw_in_color(stdscr, tgame: Tetris) -> None:
     """Draw the TetrisGame in color"""
@@ -408,6 +410,7 @@ def _curses_main(stdscr, args) -> int:
         "KEY_RIGHT": tgame.move_right,
         "KEY_DOWN": tgame.increment,
         "KEY_UP": tgame.rotate,
+        "q": tgame.set_game_over,
     }
 
     stdscr.nodelay(True)
