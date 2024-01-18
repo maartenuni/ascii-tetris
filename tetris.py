@@ -1,11 +1,16 @@
 """Classes helpfull to implement Tetris"""
 
 
-from typing import List
+from typing import List, Dict
 import random as r
 import sys
 import curses
 import time
+import argparse as ap
+
+# Dict that maps a letter to a terminal color
+COLOR_PAIRS: Dict[str, int] = {}
+
 
 class Tile:
     """A tile represents one of the faces of a Tetrominoe"""
@@ -18,7 +23,7 @@ class Tile:
         self.boolarray = boolarray
 
     @property
-    def array(self)->List[List[int]]:
+    def array(self) -> List[List[int]]:
         """short for self.boolarray"""
         return self.boolarray
 
@@ -69,7 +74,7 @@ class Tetrominoe:
         if self.rotation < 0:
             self.rotation = len(self.tiles) - 1
 
-    def reset(self)-> None:
+    def reset(self) -> None:
         """Resets rotation to orgin"""
         self.rotation = 0
 
@@ -90,7 +95,7 @@ class Tetrominoe:
 
 # Turn off black to improve readabilty
 
-#fmt: off
+# fmt: off
 
 # line Cyan
 #         #
@@ -215,7 +220,7 @@ TABLE4 = Tile(
 TABLE = Tetrominoe([TABLE1, TABLE2, TABLE3, TABLE4], "P")
 
 
-# mirrored es Green
+# mirrored es Red
 # .#     ##.
 # ## or  .##
 # #.
@@ -224,7 +229,7 @@ MES2 = Tile([[1, 1, 0], [0, 1, 1]])
 
 MES = Tetrominoe([MES1, MES2], "R")
 
-#fmt: on
+# fmt: on
 
 
 _DEF_HEIGHT = 20
@@ -241,16 +246,15 @@ class Tetris:
         self.next = r.choice(self._tetrominoes)
         self.tet_height = 0
         # Used as index, hence use integer division
-        self.tet_width = self.width//2 - self.current.width//2
+        self.tet_width = self.width // 2 - self.current.width // 2
         self._board = [
-            [" " for column in range(self.width)]
-            for row in range(self.height)
+            [" " for column in range(self.width)] for row in range(self.height)
         ]
         self.game_over = False
         self._score = 0
         self._num_successive = 0
 
-    def _paint(self, board:List[List[str]])->None:
+    def _paint(self, board: List[List[str]]) -> None:
         """Paint the current in the board. Board maybe a copy
         or self._board, in the latter case the state of the Tetris window
         is updated"""
@@ -286,16 +290,17 @@ class Tetris:
         self.current = self.next
         self.next = r.choice(self._tetrominoes)
         self.tet_height = 0
-        self.tet_width = self.width//2 - self.current.width//2
+        self.tet_width = self.width // 2 - self.current.width // 2
         if self._collision():
             self.game_over = True
 
-
     def _collision(self) -> bool:
         """Computes whether the current state represents a collision"""
-        if self.tet_width < 0: # collison with left wall
+        if self.tet_width < 0:  # collison with left wall
             return True
-        if self.tet_width + self.current.width > self.width: # collision with right wall
+        if (
+            self.tet_width + self.current.width > self.width
+        ):  # collision with right wall
             return True
         if self.tet_height + self.current.height > self.height:
             return True
@@ -303,13 +308,13 @@ class Tetris:
         tile = self.current.tile()
         for row in range(tile.height):
             for col in range(tile.width):
-                bcol = self.tet_width + col # indices on the board
+                bcol = self.tet_width + col  # indices on the board
                 brow = self.tet_height + row
                 if tile.array[row][col] and self._board[brow][bcol] != " ":
                     return True
         return False
 
-    def _is_row_full(self, row)->bool:
+    def _is_row_full(self, row) -> bool:
         """Checks whether the row is full"""
         if " " in self._board[row]:
             return False
@@ -327,7 +332,7 @@ class Tetris:
         if not collection:
             return
 
-        score = scores[len(collection)-1]
+        score = scores[len(collection) - 1]
         if len(collection) == 4:
             self._num_successive += 1
         else:
@@ -338,12 +343,10 @@ class Tetris:
 
         # clear full lines
         self._board = [
-                row for index, row in
-                enumerate(self._board) if
-                index not in collection]
+            row for index, row in enumerate(self._board) if index not in collection
+        ]
         # create a set of empty lines
-        empty = [[" " for col in range(self.width)]
-                      for row in range(len(collection))]
+        empty = [[" " for col in range(self.width)] for row in range(len(collection))]
         # concat empty lines and board with full lines removed
         self._board = empty + self._board
 
@@ -380,7 +383,22 @@ class Tetris:
         if self._collision():
             self.current.rotate_left()
 
-def _curses_main(stdscr)->int:
+
+def _draw_in_color(stdscr, tgame: Tetris) -> None:
+    """Draw the TetrisGame in color"""
+    strrep = str(tgame)
+
+    for row, line in enumerate(strrep.split("\n")):
+        for col, char in enumerate(line):
+            try:
+                stdscr.addstr(row, col, char, curses.color_pair(COLOR_PAIRS[char]))
+            except KeyError:
+                stdscr.addstr(
+                    row, col, char, curses.color_pair(0)
+                )  # default color pair
+
+
+def _curses_main(stdscr, args) -> int:
     """Play tetris using curses"""
 
     tgame = Tetris()
@@ -393,22 +411,46 @@ def _curses_main(stdscr)->int:
     }
 
     stdscr.nodelay(True)
+    if args.color:
+        if curses.has_colors():  # init global color pairs
+            COLOR_PAIRS[LINE.color] = 1
+            curses.init_pair(1, curses.COLOR_CYAN, curses.COLOR_BLACK)
+
+            COLOR_PAIRS[MEL.color] = 2
+            curses.init_pair(2, curses.COLOR_BLUE, curses.COLOR_BLACK)
+
+            COLOR_PAIRS[EL.color] = 3
+            curses.init_pair(3, curses.COLOR_WHITE, curses.COLOR_BLACK)
+
+            COLOR_PAIRS[CUBE.color] = 4
+            curses.init_pair(4, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+
+            COLOR_PAIRS[ES.color] = 5
+            curses.init_pair(5, curses.COLOR_GREEN, curses.COLOR_BLACK)
+
+            COLOR_PAIRS[TABLE.color] = 6
+            curses.init_pair(6, curses.COLOR_MAGENTA, curses.COLOR_BLACK)
+
+            COLOR_PAIRS[MES.color] = 7
+            curses.init_pair(7, curses.COLOR_RED, curses.COLOR_BLACK)
+        else:
+            print("Running without colors", file=sys.stderr)
+            args.color = False
 
     start = time.time()
     running_time = start
 
-    did_something = True # draw something at first iteration
+    did_something = True  # draw something at first iteration
 
     while not tgame.game_over:
-        
-        key = 'some key'
+        key = "some key"
 
         try:
             key = stdscr.getkey()
             did_something = True
         except Exception:
             pass
-        
+
         if key in actions:
             actions[key]()
             did_something = True
@@ -420,10 +462,13 @@ def _curses_main(stdscr)->int:
             did_something = True
         time.sleep(0.025)
 
-        if did_something: # only draw at change of state
-            stdscr.clear() ## clear screen
-            stdscr.addstr(str(tgame))
-            #stdscr.refresh()
+        if did_something:  # only draw at change of state
+            stdscr.clear()  ## clear screen
+            if args.color:
+                _draw_in_color(stdscr, tgame)
+            else:
+                stdscr.addstr(str(tgame))
+            # stdscr.refresh()
             did_something = False
 
     return tgame.score
@@ -431,8 +476,14 @@ def _curses_main(stdscr)->int:
 
 def main():
     """Main entry point for a text based Tetris"""
-    score = curses.wrapper(_curses_main)
+    cmdparser = ap.ArgumentParser("Tetris", "Play Tetris in ASCII style", "Enjoy!!")
+    cmdparser.add_argument("-c", "--color", action="store_true", help="Play in color")
+
+    args = cmdparser.parse_intermixed_args()
+
+    score = curses.wrapper(_curses_main, args)
     print(f"Score = {score}\nGame Over...")
+
 
 if __name__ == "__main__":
     main()
