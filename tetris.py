@@ -441,7 +441,11 @@ def _curses_main(stdscr, args) -> int:
             args.color = False
 
     start = time.time()
-    running_time = start
+    running_time_inc = start
+    running_time_speed = start
+
+    inc_timeout = 1.0
+    speed_up_timeout = 60
 
     did_something = True  # draw something at first iteration
 
@@ -459,11 +463,16 @@ def _curses_main(stdscr, args) -> int:
             did_something = True
 
         now = time.time()
-        if now - running_time > 1.0:
+        if now - running_time_inc > inc_timeout: # make the tetrominoe fall
             tgame.increment()
-            running_time += 1.0
+            running_time_inc += inc_timeout
             did_something = True
-        time.sleep(0.025)
+
+        if now - running_time_speed > speed_up_timeout: # speed up the game
+            inc_timeout = max(0.2, inc_timeout - 0.1)
+            running_time_speed += speed_up_timeout
+
+        time.sleep(0.010)
 
         if did_something:  # only draw at change of state
             stdscr.clear()  ## clear screen
