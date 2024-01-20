@@ -8,7 +8,9 @@ import time
 import argparse as ap
 
 # Dict that maps a letter to a terminal color
-COLOR_PAIRS: Dict[str, int] = {}
+COLOR_PAIRS: Dict[str, int] = {
+    "!": curses.A_DIM
+}
 
 
 class Tile:
@@ -268,15 +270,17 @@ class Tetris:
 
     def __str__(self) -> str:
         """Return a string repr of self"""
-        ret = "".join(["-" for row in range(self.width + 2)]) + "\n"
+        ret = "".join(["-" for row in range(self.width*2 + 1)]) + "\n"
         copy = self._copy_board()
 
         # "paint" current in copy of board
         self._paint(copy)
 
         for row in copy:
-            ret += "".join(["|", "".join(row), "|\n"])
-        ret += "".join(["-" for row in range(self.width + 2)])
+            dotted_row = [ char + "!" for char in row]
+            dotted_row[-1] = dotted_row[-1][0] # strip trailing .
+            ret += "".join(["|", "".join(dotted_row), "|\n"])
+        ret += "".join(["-" for row in range(self.width*2 + 1)])
         return ret
 
     def _copy_board(self) -> List[List[str]]:
@@ -393,7 +397,7 @@ def _draw_in_color(stdscr, tgame: Tetris) -> None:
     for row, line in enumerate(strrep.split("\n")):
         for col, char in enumerate(line):
             try:
-                stdscr.addstr(row, col, char, curses.color_pair(COLOR_PAIRS[char]))
+                stdscr.addstr(row, col, char, COLOR_PAIRS[char])
             except KeyError:
                 stdscr.addstr(
                     row, col, char, curses.color_pair(0)
@@ -413,29 +417,34 @@ def _curses_main(stdscr, args) -> int:
         "q": tgame.set_game_over,
     }
 
+    width, height = curses.COLS, curses.LINES
+    stdscr.addstr(f"width = {width}, height = {height}")
+    stdscr.refresh()
+    curses.napms(1000)
+
     stdscr.nodelay(True)
     if args.color:
         if curses.has_colors():  # init global color pairs
-            COLOR_PAIRS[LINE.color] = 1
             curses.init_pair(1, curses.COLOR_CYAN, curses.COLOR_BLACK)
+            COLOR_PAIRS[LINE.color] = curses.color_pair(1) | curses.A_BOLD
 
-            COLOR_PAIRS[MEL.color] = 2
             curses.init_pair(2, curses.COLOR_BLUE, curses.COLOR_BLACK)
+            COLOR_PAIRS[MEL.color] = curses.color_pair(2) | curses.A_BOLD
 
-            COLOR_PAIRS[EL.color] = 3
             curses.init_pair(3, curses.COLOR_WHITE, curses.COLOR_BLACK)
+            COLOR_PAIRS[EL.color] = curses.color_pair(3) | curses.A_BOLD
 
-            COLOR_PAIRS[CUBE.color] = 4
             curses.init_pair(4, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+            COLOR_PAIRS[CUBE.color] = curses.color_pair(4) | curses.A_BOLD
 
-            COLOR_PAIRS[ES.color] = 5
             curses.init_pair(5, curses.COLOR_GREEN, curses.COLOR_BLACK)
+            COLOR_PAIRS[ES.color] = curses.color_pair(5) | curses.A_BOLD
 
-            COLOR_PAIRS[TABLE.color] = 6
             curses.init_pair(6, curses.COLOR_MAGENTA, curses.COLOR_BLACK)
+            COLOR_PAIRS[TABLE.color] = curses.color_pair(6) | curses.A_BOLD
 
-            COLOR_PAIRS[MES.color] = 7
             curses.init_pair(7, curses.COLOR_RED, curses.COLOR_BLACK)
+            COLOR_PAIRS[MES.color] = curses.color_pair(7) | curses.A_BOLD
         else:
             print("Running without colors", file=sys.stderr)
             args.color = False
@@ -472,7 +481,7 @@ def _curses_main(stdscr, args) -> int:
             inc_timeout = max(0.2, inc_timeout - 0.1)
             running_time_speed += speed_up_timeout
 
-        time.sleep(0.010)
+        time.sleep(0.01)
 
         if did_something:  # only draw at change of state
             stdscr.clear()  ## clear screen
