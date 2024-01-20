@@ -354,7 +354,8 @@ class Tetris:
         self._board = empty + self._board
 
     @property
-    def score(self):
+    def score(self)->int:
+        """Get the score"""
         return self._score
 
     def increment(self):
@@ -387,8 +388,23 @@ class Tetris:
             self.current.rotate_left()
 
     def set_game_over(self):
+        """Marks the game Game Over"""
         self.game_over = True
 
+    @staticmethod
+    def str_width():
+        """Calculates the width of the __str___ representation"""
+        side_bars = 2
+        columns = 10
+        num_dots = columns - 1
+        return side_bars + columns + num_dots
+
+    @staticmethod
+    def str_height():
+        """Calculates the height of the __str___ representation"""
+        bars = 2
+        rows = 20
+        return bars + rows
 
 def _draw_in_color(stdscr, tgame: Tetris) -> None:
     """Draw the TetrisGame in color"""
@@ -403,26 +419,85 @@ def _draw_in_color(stdscr, tgame: Tetris) -> None:
                     row, col, char, curses.color_pair(0)
                 )  # default color pair
 
-
-def _curses_main(stdscr, args) -> int:
-    """Play tetris using curses"""
-
-    tgame = Tetris()
-
-    actions = {
-        "KEY_LEFT": tgame.move_left,
+def _game_loop(args, tgame: Tetris, stdscr, win, next_win=None, score_win=None) -> None:
+    """Runs the game loop until the user exits the game or
+    is game over."""
+    ACTIONS = {
+     "KEY_LEFT": tgame.move_left,
         "KEY_RIGHT": tgame.move_right,
         "KEY_DOWN": tgame.increment,
         "KEY_UP": tgame.rotate,
         "q": tgame.set_game_over,
     }
+    start = time.time()
+    running_time_inc = start
+    running_time_speed = start
+
+    inc_timeout = 1.0
+    speed_up_timeout = 60
+
+    win.nodelay(True)
+
+    did_something = True  # draw something at first iteration
+    score = -1
+
+    while not tgame.game_over:
+        key = "some key"
+
+        try:
+            key = stdscr.getkey()
+            did_something = True
+        except Exception: # No key has been pressed.
+            pass
+
+        if key in ACTIONS:
+            ACTIONS[key]()
+            did_something = True
+
+        now = time.time()
+        if now - running_time_inc > inc_timeout: # make the tetrominoe fall
+            tgame.increment()
+            running_time_inc += inc_timeout
+            did_something = True
+
+        if now - running_time_speed > speed_up_timeout: # speed up the game
+            inc_timeout = max(0.2, inc_timeout - 0.1)
+            running_time_speed += speed_up_timeout
+
+        time.sleep(0.01)
+
+        if did_something:  # only draw at change of state
+            win.clear()  ## clear screen
+            if args.color:
+                _draw_in_color(win, tgame)
+            else:
+                win.addstr(str(tgame))
+            win.refresh()
+            did_something = False
+
+        if score_win and tgame.score != score: #update the score_win if we have one
+            score = tgame.score
+            score_win.clear()
+            score_win.addstr(f"Score:\n  {score}")
+            score_win.refresh()
+
+
+def _curses_main(stdscr, args) -> int:
+    """Play tetris using curses. This function sets up the windows
+    and prepares the game to run."""
+
+    tgame = Tetris()
 
     width, height = curses.COLS, curses.LINES
-    stdscr.addstr(f"width = {width}, height = {height}")
-    stdscr.refresh()
-    curses.napms(1000)
+
+    if height < Tetris.str_height() or width < Tetris.str_width():
+        raise RuntimeError("Terminal size is {} * {}, min = {}*{}".format(
+            width, height,
+            Tetris.str_width(), Tetris.str_height())
+            )
 
     stdscr.nodelay(True)
+
     if args.color:
         if curses.has_colors():  # init global color pairs
             curses.init_pair(1, curses.COLOR_CYAN, curses.COLOR_BLACK)
@@ -449,48 +524,11 @@ def _curses_main(stdscr, args) -> int:
             print("Running without colors", file=sys.stderr)
             args.color = False
 
-    start = time.time()
-    running_time_inc = start
-    running_time_speed = start
+    board_win = curses.newwin(Tetris.str_height() + 1, Tetris.str_width() + 1)
+    next_win = None
+    score_win = curses.newwin(10, 20, Tetris.str_height() // 2, Tetris.str_width()+4)
 
-    inc_timeout = 1.0
-    speed_up_timeout = 60
-
-    did_something = True  # draw something at first iteration
-
-    while not tgame.game_over:
-        key = "some key"
-
-        try:
-            key = stdscr.getkey()
-            did_something = True
-        except Exception:
-            pass
-
-        if key in actions:
-            actions[key]()
-            did_something = True
-
-        now = time.time()
-        if now - running_time_inc > inc_timeout: # make the tetrominoe fall
-            tgame.increment()
-            running_time_inc += inc_timeout
-            did_something = True
-
-        if now - running_time_speed > speed_up_timeout: # speed up the game
-            inc_timeout = max(0.2, inc_timeout - 0.1)
-            running_time_speed += speed_up_timeout
-
-        time.sleep(0.01)
-
-        if did_something:  # only draw at change of state
-            stdscr.clear()  ## clear screen
-            if args.color:
-                _draw_in_color(stdscr, tgame)
-            else:
-                stdscr.addstr(str(tgame))
-            # stdscr.refresh()
-            did_something = False
+    _game_loop(args, tgame, stdscr, board_win, next_win, score_win)
 
     return tgame.score
 
@@ -502,8 +540,11 @@ def main():
 
     args = cmdparser.parse_intermixed_args()
 
-    score = curses.wrapper(_curses_main, args)
-    print(f"Score = {score}\nGame Over...")
+    try:
+        score = curses.wrapper(_curses_main, args)
+        print(f"Score = {score}\nGame Over...")
+    except RuntimeError as e:
+        exit(str(e))
 
 
 if __name__ == "__main__":
