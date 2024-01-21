@@ -93,7 +93,7 @@ class Tetrominoe:
         cur_tile = self.tile()
 
         tile_board = [
-            "".join([self.color if cell else " " for cell in line])
+            "".join([self.color + " " if cell else "  " for cell in line])
             for line in cur_tile.array
         ]
 
@@ -331,7 +331,7 @@ class Tetris:
     def _setup_new(self):
         """Use the next tetrominoe and compute new next"""
         self.current = self.next
-        self.next = r.choice(self._tetrominoes)
+        self.next = copy.deepcopy(r.choice(self._tetrominoes))
         self.tet_height = 0
         self.tet_width = self.width // 2 - self.current.width // 2
         if self._collision():
@@ -483,8 +483,11 @@ def _game_loop(args, tgame: Tetris, stdscr, win, next_win=None, score_win=None) 
     did_something = True  # draw something at first iteration
     score = -1
     next_tile = None
+    level = 1
+    highscore = 0
 
     while not tgame.game_over:
+        temp_level = level
         key = "some key"
 
         try:
@@ -505,9 +508,10 @@ def _game_loop(args, tgame: Tetris, stdscr, win, next_win=None, score_win=None) 
 
         if now - running_time_speed > speed_up_timeout:  # speed up the game
             inc_timeout = max(0.2, inc_timeout - 0.1)
+            temp_level += 1
             running_time_speed += speed_up_timeout
 
-        time.sleep(0.01)
+        time.sleep(0.001)
 
         if did_something:  # only draw at change of state
             win.clear()  ## clear screen
@@ -521,13 +525,19 @@ def _game_loop(args, tgame: Tetris, stdscr, win, next_win=None, score_win=None) 
         if next_win and tgame.next != next_tile:
             next_tile = copy.deepcopy(tgame.next)
             next_win.clear()
-            next_win.addstr(str(next_tile))
+            if args.color:
+                _draw_in_color(next_win, next_tile)
+            else:
+                next_win.addstr(str(next_tile))
             next_win.refresh()
 
-        if score_win and tgame.score != score:  # update the score_win if we have one
+        if score_win and tgame.score != score or temp_level != level :  # update the score_win if we have one
             score = tgame.score
+            level = temp_level
             score_win.clear()
-            score_win.addstr(f"Score:\n  {score}")
+            score_win.addstr(f"Score:\n  {score}\n")
+            score_win.addstr(f"Level:\n  {level}\n")
+            score_win.addstr(f"High score:\n  {highscore}")
             score_win.refresh()
 
 
