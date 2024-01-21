@@ -5,10 +5,11 @@ import random as r
 import sys
 import curses
 import time
+import copy
 import argparse as ap
 
 # Dict that maps a letter to a terminal color
-COLOR_PAIRS: Dict[str, int] = {}
+COLOR_PAIRS: Dict[str, int] = {"!": curses.A_DIM}
 
 
 class Tile:
@@ -21,10 +22,24 @@ class Tile:
         self._validate_boolarray(boolarray)
         self.boolarray = boolarray
 
+    def __repr__(self) -> str:
+        return "Tile(" + repr(self.boolarray) + ")"
+
     @property
     def array(self) -> List[List[int]]:
         """short for self.boolarray"""
         return self.boolarray
+
+    def __eq__(self, rhs) -> bool:
+        if self is rhs:
+            return True
+        if not isinstance(rhs, Tile):
+            return False
+        return (
+            self.height == rhs.height
+            and self.width == rhs.width
+            and self.array == rhs.array
+        )
 
     def _validate_boolarray(self, arr):
         typeerr_msg = "Array isn't a rectangular list of list of int"
@@ -58,6 +73,33 @@ class Tetrominoe:
         self.rotation = 0
         self.color = color
         self.tiles = tiles
+
+    def __eq__(self, rhs) -> bool:
+        if self is rhs:
+            return True
+        if not isinstance(rhs, Tetrominoe):
+            return False
+        return (
+            self.rotation == rhs.rotation
+            and self.color == rhs.color
+            and self.tiles == rhs.tiles
+        )
+
+    def __repr__(self) -> str:
+        return "Tetrominoe(" + repr(self.tiles) + ", " + repr(self.color) + ")"
+
+    def __str__(self) -> str:
+        """Creates a string representation of the current tile"""
+        cur_tile = self.tile()
+
+        tile_board = [
+            "".join([self.color + " " if cell else "  " for cell in line])
+            for line in cur_tile.array
+        ]
+
+        strrep = "\n".join(tile_board)
+
+        return strrep
 
     def tile(self) -> Tile:
         """Returns a tuple with the list that holds the current Tile"""
@@ -241,8 +283,8 @@ class Tetris:
     def __init__(self, width=_DEF_WIDTH, height=_DEF_HEIGHT):
         self.width, self.height = width, height
         self._tetrominoes = [LINE, MEL, EL, CUBE, ES, TABLE, MES]
-        self.current = r.choice(self._tetrominoes)
-        self.next = r.choice(self._tetrominoes)
+        self.current = copy.deepcopy(r.choice(self._tetrominoes))
+        self.next = copy.deepcopy(r.choice(self._tetrominoes))
         self.tet_height = 0
         # Used as index, hence use integer division
         self.tet_width = self.width // 2 - self.current.width // 2
@@ -253,7 +295,7 @@ class Tetris:
         self._score = 0
         self._num_successive = 0
 
-    def _paint(self, board: List[List[str]]) -> None:
+    def _paint_current(self, board: List[List[str]]) -> None:
         """Paint the current in the board. Board maybe a copy
         or self._board, in the latter case the state of the Tetris window
         is updated"""
@@ -268,15 +310,17 @@ class Tetris:
 
     def __str__(self) -> str:
         """Return a string repr of self"""
-        ret = "".join(["-" for row in range(self.width + 2)]) + "\n"
+        ret = "".join(["-" for row in range(self.width * 2 + 1)]) + "\n"
         copy = self._copy_board()
 
         # "paint" current in copy of board
-        self._paint(copy)
+        self._paint_current(copy)
 
         for row in copy:
-            ret += "".join(["|", "".join(row), "|\n"])
-        ret += "".join(["-" for row in range(self.width + 2)])
+            dotted_row = [char + "!" for char in row]
+            dotted_row[-1] = dotted_row[-1][0]  # strip trailing .
+            ret += "".join(["|", "".join(dotted_row), "|\n"])
+        ret += "".join(["-" for row in range(self.width * 2 + 1)])
         return ret
 
     def _copy_board(self) -> List[List[str]]:
@@ -287,7 +331,7 @@ class Tetris:
     def _setup_new(self):
         """Use the next tetrominoe and compute new next"""
         self.current = self.next
-        self.next = r.choice(self._tetrominoes)
+        self.next = copy.deepcopy(r.choice(self._tetrominoes))
         self.tet_height = 0
         self.tet_width = self.width // 2 - self.current.width // 2
         if self._collision():
@@ -350,7 +394,8 @@ class Tetris:
         self._board = empty + self._board
 
     @property
-    def score(self):
+    def score(self) -> int:
+        """Get the score"""
         return self._score
 
     def increment(self):
@@ -358,7 +403,7 @@ class Tetris:
         self.tet_height += 1
         if self._collision():
             self.tet_height -= 1
-            self._paint(self._board)
+            self._paint_current(self._board)
             self._check_score()
             self._setup_new()
 
@@ -383,7 +428,23 @@ class Tetris:
             self.current.rotate_left()
 
     def set_game_over(self):
+        """Marks the game Game Over"""
         self.game_over = True
+
+    @staticmethod
+    def str_width():
+        """Calculates the width of the __str___ representation"""
+        side_bars = 2
+        columns = 10
+        num_dots = columns - 1
+        return side_bars + columns + num_dots
+
+    @staticmethod
+    def str_height():
+        """Calculates the height of the __str___ representation"""
+        bars = 2
+        rows = 20
+        return bars + rows
 
 
 def _draw_in_color(stdscr, tgame: Tetris) -> None:
@@ -393,53 +454,23 @@ def _draw_in_color(stdscr, tgame: Tetris) -> None:
     for row, line in enumerate(strrep.split("\n")):
         for col, char in enumerate(line):
             try:
-                stdscr.addstr(row, col, char, curses.color_pair(COLOR_PAIRS[char]))
+                stdscr.addstr(row, col, char, COLOR_PAIRS[char])
             except KeyError:
                 stdscr.addstr(
                     row, col, char, curses.color_pair(0)
                 )  # default color pair
 
 
-def _curses_main(stdscr, args) -> int:
-    """Play tetris using curses"""
-
-    tgame = Tetris()
-
-    actions = {
+def _game_loop(args, tgame: Tetris, stdscr, win, next_win=None, score_win=None) -> None:
+    """Runs the game loop until the user exits the game or
+    is game over."""
+    ACTIONS = {
         "KEY_LEFT": tgame.move_left,
         "KEY_RIGHT": tgame.move_right,
         "KEY_DOWN": tgame.increment,
         "KEY_UP": tgame.rotate,
         "q": tgame.set_game_over,
     }
-
-    stdscr.nodelay(True)
-    if args.color:
-        if curses.has_colors():  # init global color pairs
-            COLOR_PAIRS[LINE.color] = 1
-            curses.init_pair(1, curses.COLOR_CYAN, curses.COLOR_BLACK)
-
-            COLOR_PAIRS[MEL.color] = 2
-            curses.init_pair(2, curses.COLOR_BLUE, curses.COLOR_BLACK)
-
-            COLOR_PAIRS[EL.color] = 3
-            curses.init_pair(3, curses.COLOR_WHITE, curses.COLOR_BLACK)
-
-            COLOR_PAIRS[CUBE.color] = 4
-            curses.init_pair(4, curses.COLOR_YELLOW, curses.COLOR_BLACK)
-
-            COLOR_PAIRS[ES.color] = 5
-            curses.init_pair(5, curses.COLOR_GREEN, curses.COLOR_BLACK)
-
-            COLOR_PAIRS[TABLE.color] = 6
-            curses.init_pair(6, curses.COLOR_MAGENTA, curses.COLOR_BLACK)
-
-            COLOR_PAIRS[MES.color] = 7
-            curses.init_pair(7, curses.COLOR_RED, curses.COLOR_BLACK)
-        else:
-            print("Running without colors", file=sys.stderr)
-            args.color = False
-
     start = time.time()
     running_time_inc = start
     running_time_speed = start
@@ -447,41 +478,117 @@ def _curses_main(stdscr, args) -> int:
     inc_timeout = 1.0
     speed_up_timeout = 60
 
+    win.nodelay(True)
+
     did_something = True  # draw something at first iteration
+    score = -1
+    next_tile = None
+    level = 1
+    highscore = 0
 
     while not tgame.game_over:
+        temp_level = level
         key = "some key"
 
         try:
             key = stdscr.getkey()
             did_something = True
-        except Exception:
+        except Exception:  # No key has been pressed.
             pass
 
-        if key in actions:
-            actions[key]()
+        if key in ACTIONS:
+            ACTIONS[key]()
             did_something = True
 
         now = time.time()
-        if now - running_time_inc > inc_timeout: # make the tetrominoe fall
+        if now - running_time_inc > inc_timeout:  # make the tetrominoe fall
             tgame.increment()
             running_time_inc += inc_timeout
             did_something = True
 
-        if now - running_time_speed > speed_up_timeout: # speed up the game
+        if now - running_time_speed > speed_up_timeout:  # speed up the game
             inc_timeout = max(0.2, inc_timeout - 0.1)
+            temp_level += 1
             running_time_speed += speed_up_timeout
 
-        time.sleep(0.010)
+        time.sleep(0.001)
 
         if did_something:  # only draw at change of state
-            stdscr.clear()  ## clear screen
+            win.clear()  ## clear screen
             if args.color:
-                _draw_in_color(stdscr, tgame)
+                _draw_in_color(win, tgame)
             else:
-                stdscr.addstr(str(tgame))
-            # stdscr.refresh()
+                win.addstr(str(tgame))
+            win.refresh()
             did_something = False
+
+        if next_win and tgame.next != next_tile:
+            next_tile = copy.deepcopy(tgame.next)
+            next_win.clear()
+            if args.color:
+                _draw_in_color(next_win, next_tile)
+            else:
+                next_win.addstr(str(next_tile))
+            next_win.refresh()
+
+        if score_win and tgame.score != score or temp_level != level :  # update the score_win if we have one
+            score = tgame.score
+            level = temp_level
+            score_win.clear()
+            score_win.addstr(f"Score:\n  {score}\n")
+            score_win.addstr(f"Level:\n  {level}\n")
+            score_win.addstr(f"High score:\n  {highscore}")
+            score_win.refresh()
+
+
+def _curses_main(stdscr, args) -> int:
+    """Play tetris using curses. This function sets up the windows
+    and prepares the game to run."""
+
+    tgame = Tetris()
+
+    width, height = curses.COLS, curses.LINES
+
+    if height < Tetris.str_height() or width < Tetris.str_width():
+        raise RuntimeError(
+            "Terminal size is {} * {}, min = {}*{}".format(
+                width, height, Tetris.str_width(), Tetris.str_height()
+            )
+        )
+
+    stdscr.nodelay(True)
+
+    if args.color:
+        if curses.has_colors():  # init global color pairs
+            curses.init_pair(1, curses.COLOR_CYAN, curses.COLOR_BLACK)
+            COLOR_PAIRS[LINE.color] = curses.color_pair(1) | curses.A_BOLD
+
+            curses.init_pair(2, curses.COLOR_BLUE, curses.COLOR_BLACK)
+            COLOR_PAIRS[MEL.color] = curses.color_pair(2) | curses.A_BOLD
+
+            curses.init_pair(3, curses.COLOR_WHITE, curses.COLOR_BLACK)
+            COLOR_PAIRS[EL.color] = curses.color_pair(3) | curses.A_BOLD
+
+            curses.init_pair(4, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+            COLOR_PAIRS[CUBE.color] = curses.color_pair(4) | curses.A_BOLD
+
+            curses.init_pair(5, curses.COLOR_GREEN, curses.COLOR_BLACK)
+            COLOR_PAIRS[ES.color] = curses.color_pair(5) | curses.A_BOLD
+
+            curses.init_pair(6, curses.COLOR_MAGENTA, curses.COLOR_BLACK)
+            COLOR_PAIRS[TABLE.color] = curses.color_pair(6) | curses.A_BOLD
+
+            curses.init_pair(7, curses.COLOR_RED, curses.COLOR_BLACK)
+            COLOR_PAIRS[MES.color] = curses.color_pair(7) | curses.A_BOLD
+        else:
+            print("Running without colors", file=sys.stderr)
+            args.color = False
+
+    board_win = curses.newwin(Tetris.str_height() + 1, Tetris.str_width() + 1)
+    next_win = curses.newwin(10, 20, 2, Tetris.str_width() + 4)
+    score_win = curses.newwin(10, 20, Tetris.str_height() // 2, Tetris.str_width() + 4)
+
+    _game_loop(args, tgame, stdscr, board_win, next_win, score_win)
 
     return tgame.score
 
@@ -493,8 +600,11 @@ def main():
 
     args = cmdparser.parse_intermixed_args()
 
-    score = curses.wrapper(_curses_main, args)
-    print(f"Score = {score}\nGame Over...")
+    try:
+        score = curses.wrapper(_curses_main, args)
+        print(f"Score = {score}\nGame Over...")
+    except RuntimeError as e:
+        exit(str(e))
 
 
 if __name__ == "__main__":
