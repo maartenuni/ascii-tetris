@@ -33,6 +33,8 @@ class Tile:
     def __eq__(self, rhs) -> bool:
         if self is rhs:
             return True
+        if not isinstance(rhs, Tile):
+            return False
         return (
             self.height == rhs.height
             and self.width == rhs.width
@@ -75,6 +77,8 @@ class Tetrominoe:
     def __eq__(self, rhs) -> bool:
         if self is rhs:
             return True
+        if not isinstance(rhs, Tetrominoe):
+            return False
         return (
             self.rotation == rhs.rotation
             and self.color == rhs.color
@@ -85,6 +89,7 @@ class Tetrominoe:
         return "Tetrominoe(" + repr(self.tiles) + ", " + repr(self.color) + ")"
 
     def __str__(self) -> str:
+        """Creates a string representation of the current tile"""
         cur_tile = self.tile()
 
         tile_board = [
@@ -477,6 +482,7 @@ def _game_loop(args, tgame: Tetris, stdscr, win, next_win=None, score_win=None) 
 
     did_something = True  # draw something at first iteration
     score = -1
+    next_tile = None
 
     while not tgame.game_over:
         key = "some key"
@@ -511,6 +517,12 @@ def _game_loop(args, tgame: Tetris, stdscr, win, next_win=None, score_win=None) 
                 win.addstr(str(tgame))
             win.refresh()
             did_something = False
+
+        if next_win and tgame.next != next_tile:
+            next_tile = copy.deepcopy(tgame.next)
+            next_win.clear()
+            next_win.addstr(str(next_tile))
+            next_win.refresh()
 
         if score_win and tgame.score != score:  # update the score_win if we have one
             score = tgame.score
@@ -563,7 +575,7 @@ def _curses_main(stdscr, args) -> int:
             args.color = False
 
     board_win = curses.newwin(Tetris.str_height() + 1, Tetris.str_width() + 1)
-    next_win = None
+    next_win = curses.newwin(10, 20, 2, Tetris.str_width() + 4)
     score_win = curses.newwin(10, 20, Tetris.str_height() // 2, Tetris.str_width() + 4)
 
     _game_loop(args, tgame, stdscr, board_win, next_win, score_win)
