@@ -152,7 +152,7 @@ def _curses_main(stdscr, args) -> int:
             args.color = False
 
     board_win = curses.newwin(Tetris.str_height() + 1, Tetris.str_width() + 1)
-    next_win = curses.newwin(10, 20, 2, Tetris.str_width() + 4)
+    next_win = curses.newwin(8, 8, 2, Tetris.str_width() + 4)
     score_win = curses.newwin(10, 20, Tetris.str_height() // 2, Tetris.str_width() + 4)
 
     _game_loop(args, tgame, stdscr, board_win, next_win, score_win)
