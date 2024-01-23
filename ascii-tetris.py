@@ -7,12 +7,18 @@ import argparse as ap
 import sys
 from typing import Dict
 import time
+import logging
 
+from config import ConfigFile
 from tetris import Tetris, LINE, MEL, EL, CUBE, MES, TABLE, ES
 
 
 # Dict that maps a letter to a terminal color
 COLOR_PAIRS: Dict[str, int] = {"!": curses.A_DIM}
+
+# Store config info
+_config = {}
+
 
 def _draw_in_color(stdscr, tgame: Tetris) -> None:
     """Draw the TetrisGame in color"""
@@ -31,6 +37,7 @@ def _draw_in_color(stdscr, tgame: Tetris) -> None:
 def _game_loop(args, tgame: Tetris, stdscr, win, next_win=None, score_win=None) -> None:
     """Runs the game loop until the user exits the game or
     is game over."""
+    global _config
     ACTIONS = {
         "KEY_LEFT": tgame.move_left,
         "KEY_RIGHT": tgame.move_right,
@@ -51,7 +58,16 @@ def _game_loop(args, tgame: Tetris, stdscr, win, next_win=None, score_win=None) 
     score = -1
     next_tile = None
     level = 1
+
     highscore = 0
+    player = ""
+    try:
+        highscore = _config["score"]["highscore"]
+        player = _config["score"]["player"]
+    except KeyError as _error:
+        _config["score"] = {"highscore": 0, "player": ""}
+        highscore = _config["score"]["highscore"]
+        player = _config["score"]["player"]
 
     while not tgame.game_over:
         temp_level = level
@@ -69,12 +85,14 @@ def _game_loop(args, tgame: Tetris, stdscr, win, next_win=None, score_win=None) 
 
         now = time.time()
         if now - running_time_inc > inc_timeout:  # make the tetrominoe fall
+            logging.debug(f"now = {now}, inc_timeout = {inc_timeout}") 
             tgame.increment()
             running_time_inc += inc_timeout
             did_something = True
 
         if now - running_time_speed > speed_up_timeout:  # speed up the game
-            inc_timeout = max(0.2, inc_timeout - 0.1)
+            logging.info(f"now = {now}, speed_up_timeout = {speed_up_timeout}") 
+            inc_timeout = max(0.2, inc_timeout * .95)
             temp_level += 1
             running_time_speed += speed_up_timeout
 
@@ -98,7 +116,8 @@ def _game_loop(args, tgame: Tetris, stdscr, win, next_win=None, score_win=None) 
                 next_win.addstr(str(next_tile))
             next_win.refresh()
 
-        if score_win and tgame.score != score or temp_level != level :  # update the score_win if we have one
+        if score_win and tgame.score != score or temp_level != level:
+            # update the score_win if we have one
             score = tgame.score
             level = temp_level
             score_win.clear()
@@ -164,16 +183,27 @@ def main():
     """Main entry point for a text based Tetris"""
     cmdparser = ap.ArgumentParser("Tetris", "Play Tetris in ASCII style", "Enjoy!!")
     cmdparser.add_argument("-c", "--color", action="store_true", help="Play in color")
+    cmdparser.add_argument("-l", "--log-file", type=str, help="specify a log file to log to.")
 
     args = cmdparser.parse_intermixed_args()
 
+    if args.log_file:
+        logging.basicConfig(filename = "ascii-tetris.log", level=logging.DEBUG)
+
     try:
+        global _config
+        _config = ConfigFile().read()
+
         score = curses.wrapper(_curses_main, args)
+
+        if score > _config["score"]["highscore"]:
+            player = input("New highscore enter player name:")
+            _config["score"] = {"highscore": score, "player": player}
+            ConfigFile().write(_config)
         print(f"Score = {score}\nGame Over...")
-    except RuntimeError as e:
-        exit(str(e))
+    except RuntimeError as error:
+        sys.exit(str(error))
 
 
 if __name__ == "__main__":
     main()
-
