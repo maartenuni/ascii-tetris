@@ -3,6 +3,7 @@
 from typing import List
 import random as r
 import copy
+import logging as log
 
 
 class Tile:
@@ -391,7 +392,7 @@ class Tetris:
         """Get the score"""
         return self._score
 
-    def increment(self):
+    def increment(self) -> None:
         """Make the tetrominoe advance one position"""
         self.tet_height += 1
         if self._collision():
@@ -399,6 +400,17 @@ class Tetris:
             self._paint_current(self._board)
             self._check_score()
             self._setup_new()
+
+    def drop(self)-> None:
+        """drop the tetrominoe as far to the bottom as possible"""
+        last_height = self.tet_height
+        log.info("dropping")
+        while True:
+            self.increment()
+            log.debug(f"last_height = {last_height}, tet_height={self.tet_height}")
+            if last_height >= self.tet_height:
+                break
+            last_height = self.tet_height
 
     def move_left(self) -> None:
         """Moves the current tetrominoe to the left if it
