@@ -17,7 +17,7 @@ from tetris import Tetris, LINE, MEL, EL, CUBE, MES, TABLE, ES
 COLOR_PAIRS: Dict[str, int] = {"!": curses.A_DIM}
 
 # Store config info
-_config = {}
+_config = None
 
 
 def _draw_in_color(stdscr, tgame: Tetris) -> None:
@@ -44,6 +44,7 @@ def _game_loop(args, tgame: Tetris, stdscr, win, next_win=None, score_win=None) 
         "KEY_DOWN": tgame.increment,
         "KEY_UP": tgame.rotate,
         "q": tgame.set_game_over,
+        " ": tgame.drop,
     }
     start = time.time()
     running_time_inc = start
