@@ -182,14 +182,23 @@ def _curses_main(stdscr, args) -> int:
 
 def main():
     """Main entry point for a text based Tetris"""
-    cmdparser = ap.ArgumentParser("Tetris", "Play Tetris in ASCII style", "Enjoy!!")
+    loglevelmap = {
+        "debug": logging.DEBUG,
+        "info": logging.INFO,
+        "warning": logging.WARNING,
+        "error": logging.ERROR,
+    }
+    cmdparser = ap.ArgumentParser("Tetris", "Play Tetᴙis in ASCII style", "Enjoy!!")
     cmdparser.add_argument("-c", "--color", action="store_true", help="Play in color")
     cmdparser.add_argument("-l", "--log-file", type=str, help="specify a log file to log to.")
+    cmdparser.add_argument("-L", "--log-level", type=str, choices=loglevelmap.keys(), default="info", help="specify the desired loglevel.")
 
     args = cmdparser.parse_intermixed_args()
 
     if args.log_file:
-        logging.basicConfig(filename = "ascii-tetris.log", level=logging.DEBUG)
+        level = loglevelmap[args.log_level]
+        logging.basicConfig(filename = args.log_file, level=logging.DEBUG)
+        logging.info("logging with loglevel: {}".format(args.log_level.upper()))
 
     try:
         global _config
