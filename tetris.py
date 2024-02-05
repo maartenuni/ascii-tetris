@@ -288,6 +288,7 @@ class Tetris:
         self.game_over = False
         self._score = 0
         self._num_successive = 0
+        self.lines = 0
 
     def _paint_current(self, board: List[List[str]]) -> None:
         """Paint the current in the board. Board maybe a copy
@@ -365,6 +366,7 @@ class Tetris:
 
         collection = [row for row in range(len(self._board)) if self._is_row_full(row)]
         assert 0 <= len(collection) <= 4
+        self.lines += len(collection)
 
         if not collection:
             return
@@ -392,6 +394,11 @@ class Tetris:
         """Get the score"""
         return self._score
 
+    @property
+    def level(self) -> int:
+        """Get the current level"""
+        return self.lines // 10
+
     def increment(self) -> None:
         """Make the tetrominoe advance one position"""
         self.tet_height += 1
@@ -401,7 +408,7 @@ class Tetris:
             self._check_score()
             self._setup_new()
 
-    def drop(self)-> None:
+    def drop(self) -> None:
         """drop the tetrominoe as far to the bottom as possible"""
         last_height = self.tet_height
         log.info("dropping")
@@ -450,4 +457,3 @@ class Tetris:
         bars = 2
         rows = 20
         return bars + rows
-

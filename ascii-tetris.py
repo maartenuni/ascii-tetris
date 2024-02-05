@@ -58,7 +58,7 @@ def _game_loop(args, tgame: Tetris, stdscr, win, next_win=None, score_win=None) 
     did_something = True  # draw something at first iteration
     score = -1
     next_tile = None
-    level = 1
+    level = tgame.level
 
     highscore = 0
     player = ""
@@ -91,12 +91,6 @@ def _game_loop(args, tgame: Tetris, stdscr, win, next_win=None, score_win=None) 
             running_time_inc += inc_timeout
             did_something = True
 
-        if now - running_time_speed > speed_up_timeout:  # speed up the game
-            logging.info(f"now = {now}, speed_up_timeout = {speed_up_timeout}")
-            inc_timeout = max(0.2, inc_timeout * 0.95)
-            temp_level += 1
-            running_time_speed += speed_up_timeout
-
         time.sleep(0.001)
 
         if did_something:  # only draw at change of state
@@ -126,6 +120,9 @@ def _game_loop(args, tgame: Tetris, stdscr, win, next_win=None, score_win=None) 
             score_win.addstr(f"Level:\n  {level}\n")
             score_win.addstr(f"High score:\n  {highscore}")
             score_win.refresh()
+
+        if level != tgame.level:
+            level = tgame.level
 
 
 def _curses_main(stdscr, args) -> int:
