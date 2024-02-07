@@ -358,12 +358,17 @@ class Tetris:
             return False
         return True
 
+    def _calc_score(self, num_lines: int) -> int:
+        """Compute the score for a number of lines cleared"""
+        if not 0 < num_lines <= 4:
+            raise ValueError("Num lines must be one of: [1,2,3,4]")
+        scores = [40, 100, 300, 1200]
+        return scores[num_lines - 1] * (self.level + 1)
+
     def _check_score(self):
         """Checks the whether some rows are complete. Updates
         the score and board accordingly.
         """
-        scores = [100, 200, 400, 800]
-
         collection = [row for row in range(len(self._board)) if self._is_row_full(row)]
         assert 0 <= len(collection) <= 4
         self.lines += len(collection)
@@ -371,14 +376,7 @@ class Tetris:
         if not collection:
             return
 
-        score = scores[len(collection) - 1]
-        if len(collection) == 4:
-            self._num_successive += 1
-        else:
-            self._num_successive = 0
-
-        score += 1200 * self._num_successive
-        self._score += score
+        self._score += self._calc_score(len(collection))
 
         # clear full lines
         self._board = [
