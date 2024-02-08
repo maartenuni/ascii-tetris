@@ -3,6 +3,7 @@
 from typing import List
 import random as r
 import copy
+import nesdata as nd
 import logging as log
 
 
@@ -274,8 +275,13 @@ _DEF_WIDTH = 10
 class Tetris:
     """Basic playing board for playing tetris"""
 
-    def __init__(self, width=_DEF_WIDTH, height=_DEF_HEIGHT):
+    styles = ["NTSC", "PAL"]
+
+    def __init__(self, width=_DEF_WIDTH, height=_DEF_HEIGHT, style="NTSC"):
+        if style not in Tetris.styles:
+            raise ValueError(f"style should be one of {Tetris.styles}")
         self.width, self.height = width, height
+        self._style = style
         self._tetrominoes = [LINE, MEL, EL, CUBE, ES, TABLE, MES]
         self.current = copy.deepcopy(r.choice(self._tetrominoes))
         self.next = copy.deepcopy(r.choice(self._tetrominoes))
@@ -288,6 +294,7 @@ class Tetris:
         self.game_over = False
         self._score = 0
         self._num_successive = 0
+        self.lines = 0
 
     def _paint_current(self, board: List[List[str]]) -> None:
         """Paint the current in the board. Board maybe a copy
@@ -357,26 +364,25 @@ class Tetris:
             return False
         return True
 
+    def _calc_score(self, num_lines: int) -> int:
+        """Compute the score for a number of lines cleared"""
+        if not 0 < num_lines <= 4:
+            raise ValueError("Num lines must be one of: [1,2,3,4]")
+        scores = [40, 100, 300, 1200]
+        return scores[num_lines - 1] * (self.level + 1)
+
     def _check_score(self):
         """Checks the whether some rows are complete. Updates
         the score and board accordingly.
         """
-        scores = [100, 200, 400, 800]
-
         collection = [row for row in range(len(self._board)) if self._is_row_full(row)]
         assert 0 <= len(collection) <= 4
+        self.lines += len(collection)
 
         if not collection:
             return
 
-        score = scores[len(collection) - 1]
-        if len(collection) == 4:
-            self._num_successive += 1
-        else:
-            self._num_successive = 0
-
-        score += 1200 * self._num_successive
-        self._score += score
+        self._score += self._calc_score(len(collection))
 
         # clear full lines
         self._board = [
@@ -392,6 +398,23 @@ class Tetris:
         """Get the score"""
         return self._score
 
+    @property
+    def level(self) -> int:
+        """Get the current level"""
+        return self.lines // 10
+
+    @property
+    def fall_duration(self) -> float:
+        """Returns the duration when the block should fall for one level"""
+        if self._style == "NTSC":
+            num_frames = nd.NTSC_NF_DESCENT[self.level]
+            return num_frames * (1 / nd.NTSC_FPS)
+        elif self._style == "PAL":
+            num_frames = nd.PAL_NF_DESCENT[self.level]
+            return num_frames * (1 / nd.PAL_FPS)
+        else:
+            raise ValueError("Unexpected/unhandled value encountered")
+
     def increment(self) -> None:
         """Make the tetrominoe advance one position"""
         self.tet_height += 1
@@ -401,7 +424,7 @@ class Tetris:
             self._check_score()
             self._setup_new()
 
-    def drop(self)-> None:
+    def drop(self) -> None:
         """drop the tetrominoe as far to the bottom as possible"""
         last_height = self.tet_height
         log.info("dropping")
@@ -450,4 +473,3 @@ class Tetris:
         bars = 2
         rows = 20
         return bars + rows
-
