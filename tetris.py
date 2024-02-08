@@ -3,6 +3,7 @@
 from typing import List
 import random as r
 import copy
+import nesdata as nd
 import logging as log
 
 
@@ -274,8 +275,13 @@ _DEF_WIDTH = 10
 class Tetris:
     """Basic playing board for playing tetris"""
 
-    def __init__(self, width=_DEF_WIDTH, height=_DEF_HEIGHT):
+    styles = ["NTSC", "PAL"]
+
+    def __init__(self, width=_DEF_WIDTH, height=_DEF_HEIGHT, style="NTSC"):
+        if style not in Tetris.styles:
+            raise ValueError(f"style should be one of {Tetris.styles}")
         self.width, self.height = width, height
+        self._style = style
         self._tetrominoes = [LINE, MEL, EL, CUBE, ES, TABLE, MES]
         self.current = copy.deepcopy(r.choice(self._tetrominoes))
         self.next = copy.deepcopy(r.choice(self._tetrominoes))
@@ -396,6 +402,18 @@ class Tetris:
     def level(self) -> int:
         """Get the current level"""
         return self.lines // 10
+
+    @property
+    def fall_duration(self) -> float:
+        """Returns the duration when the block should fall for one level"""
+        if self._style == "NTSC":
+            num_frames = nd.NTSC_NF_DESCENT[self.level]
+            return num_frames * (1 / nd.NTSC_FPS)
+        elif self._style == "PAL":
+            num_frames = nd.PAL_NF_DESCENT[self.level]
+            return num_frames * (1 / nd.PAL_FPS)
+        else:
+            raise ValueError("Unexpected/unhandled value encountered")
 
     def increment(self) -> None:
         """Make the tetrominoe advance one position"""

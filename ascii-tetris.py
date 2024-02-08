@@ -48,10 +48,6 @@ def _game_loop(args, tgame: Tetris, stdscr, win, next_win=None, score_win=None) 
     }
     start = time.time()
     running_time_inc = start
-    running_time_speed = start
-
-    inc_timeout = 1.0
-    speed_up_timeout = 60
 
     win.nodelay(True)
 
@@ -85,10 +81,10 @@ def _game_loop(args, tgame: Tetris, stdscr, win, next_win=None, score_win=None) 
             did_something = True
 
         now = time.time()
-        if now - running_time_inc > inc_timeout:  # make the tetrominoe fall
-            logging.debug(f"now = {now}, inc_timeout = {inc_timeout}")
+        if now - running_time_inc > tgame.fall_duration:  # make the tetrominoe fall
+            logging.debug(f"now = {now}, inc_timeout = {tgame.fall_duration}")
             tgame.increment()
-            running_time_inc += inc_timeout
+            running_time_inc += tgame.fall_duration
             did_something = True
 
         time.sleep(0.001)
@@ -129,7 +125,7 @@ def _curses_main(stdscr, args) -> int:
     """Play tetris using curses. This function sets up the windows
     and prepares the game to run."""
 
-    tgame = Tetris()
+    tgame = Tetris(style=args.style)
 
     width, height = curses.COLS, curses.LINES
 
@@ -199,6 +195,16 @@ def main():
         choices=loglevelmap.keys(),
         default="info",
         help="specify the desired loglevel.",
+    )
+    cmdparser.add_argument(
+        "-s",
+        "--style",
+        choices=["NTSC", "PAL"],
+        default="NTSC",
+        help=(
+            "Determines the emulating a NTSC or PAL NES, this affects the "
+            "speed that the tetrominoes are falling"
+        ),
     )
 
     args = cmdparser.parse_intermixed_args()
